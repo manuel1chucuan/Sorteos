@@ -6,6 +6,11 @@ const WINNER_LIGHT = ["#ff005c", "#ff7a00", "#ffe600", "#00ff85", "#00c8ff", "#7
 const WINNER_DARK = ["#050816", "#101b4f", "#2b1055", "#081833", "#020617"];
 const WINNER_FACTORY = ["#d92d20", "#155eef", "#f7b801", "#d92d20"];
 const THEMES = ["light", "dark", "factory"];
+const VIEWS = ["wheel", "stats", "history", "more"];
+const MOBILE_GESTURE_QUERY = "(max-width: 720px)";
+const MOBILE_ORIENTATION_QUERY = "(max-width: 1024px) and (orientation: landscape)";
+const PULL_TO_REFRESH_DISTANCE = 96;
+const SWIPE_DISTANCE = 72;
 const SPEEDS = {
   1: { duration: 5200, pause: 1300, spins: 7 },
   2: { duration: 3900, pause: 900, spins: 6 },
@@ -45,6 +50,7 @@ const els = {
   confettiCanvas: document.querySelector("#confettiCanvas"),
   centerLabel: document.querySelector("#centerLabel"),
   toast: document.querySelector("#toast"),
+  themeMeta: document.querySelector('meta[name="theme-color"]'),
   themeToggle: document.querySelector("#themeToggle"),
   totalDraws: document.querySelector("#totalDraws"),
   topWinner: document.querySelector("#topWinner"),
@@ -75,6 +81,16 @@ let audioReadyPromise = null;
 let startDrawPointerHandled = false;
 let spinSoundWarmupDone = false;
 let spinSoundWarmupRunning = false;
+const mobileGestureMedia = window.matchMedia(MOBILE_GESTURE_QUERY);
+const mobileLandscapeMedia = window.matchMedia(MOBILE_ORIENTATION_QUERY);
+const touchGesture = {
+  startX: 0,
+  startY: 0,
+  startTime: 0,
+  target: null,
+  startedAtTop: false,
+  pulling: false,
+};
 
 function defaultState() {
   return {
@@ -85,7 +101,7 @@ function defaultState() {
       speed: 2,
       avoidRepeat: false,
       soundEnabled: true,
-      theme: "light",
+      theme: "dark",
     },
     history: [],
     sessionWinners: [],
@@ -125,6 +141,12 @@ function uniqueNames(names) {
 function setTheme() {
   document.body.classList.toggle("dark", state.settings.theme === "dark");
   document.body.classList.toggle("factory", state.settings.theme === "factory");
+  const themeColor = {
+    light: "#f5f7fb",
+    dark: "#111827",
+    factory: "#111827",
+  }[state.settings.theme] || "#111827";
+  els.themeMeta?.setAttribute("content", themeColor);
   const label = {
     light: "Tema claro",
     dark: "Tema oscuro",
@@ -1113,9 +1135,130 @@ function setMobileParticipantsPanel(open) {
   els.mobileParticipantsOpen.setAttribute("aria-expanded", String(open));
 }
 
+function bindMediaChange(mediaQuery, handler) {
+  if (mediaQuery.addEventListener) {
+    mediaQuery.addEventListener("change", handler);
+    return;
+  }
+  mediaQuery.addListener(handler);
+}
+
+function updateLandscapeWheelMode() {
+  document.body.classList.toggle("landscape-wheel-mode", mobileLandscapeMedia.matches);
+  if (mobileLandscapeMedia.matches) {
+    setMobileParticipantsPanel(false);
+    requestAnimationFrame(() => drawWheel(state.participants));
+  }
+}
+
+function setActiveView(viewName) {
+  if (!VIEWS.includes(viewName)) return;
+  document.querySelectorAll(".tab-button").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.view === viewName);
+  });
+  document.querySelectorAll(".view").forEach((view) => {
+    view.classList.toggle("active-view", view.id === `${viewName}View`);
+  });
+  if (viewName !== "wheel") {
+    setMobileParticipantsPanel(false);
+  }
+}
+
+function currentViewName() {
+  const active = document.querySelector(".view.active-view");
+  return active?.id?.replace(/View$/, "") || "wheel";
+}
+
+function changeViewBySwipe(direction) {
+  const currentIndex = VIEWS.indexOf(currentViewName());
+  const nextIndex = currentIndex + direction;
+  if (nextIndex < 0 || nextIndex >= VIEWS.length) return;
+  setActiveView(VIEWS[nextIndex]);
+}
+
+function isGestureTargetBlocked(target) {
+  if (!(target instanceof Element)) return true;
+  return Boolean(target.closest("input, textarea, select, button, a, .winner-alert, .mobile-participants-open .participants-panel"));
+}
+
+function nearestScrollable(target) {
+  let node = target instanceof Element ? target : null;
+  while (node && node !== document.body) {
+    const style = getComputedStyle(node);
+    const canScroll = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight;
+    if (canScroll) return node;
+    node = node.parentElement;
+  }
+  return document.scrollingElement;
+}
+
+function isGestureAtTop(target) {
+  const scroller = nearestScrollable(target);
+  return (scroller?.scrollTop || 0) <= 1;
+}
+
+function bindMobileGestures() {
+  document.addEventListener("touchstart", (event) => {
+    if (!mobileGestureMedia.matches || mobileLandscapeMedia.matches || event.touches.length !== 1) return;
+    const target = event.target;
+    if (isGestureTargetBlocked(target)) {
+      touchGesture.target = null;
+      return;
+    }
+    const touch = event.touches[0];
+    touchGesture.startX = touch.clientX;
+    touchGesture.startY = touch.clientY;
+    touchGesture.startTime = performance.now();
+    touchGesture.target = target;
+    touchGesture.startedAtTop = isGestureAtTop(target);
+    touchGesture.pulling = false;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (event) => {
+    if (!touchGesture.target || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - touchGesture.startX;
+    const dy = touch.clientY - touchGesture.startY;
+    const verticalPull = touchGesture.startedAtTop && dy > 16 && Math.abs(dy) > Math.abs(dx) * 1.35;
+    if (!verticalPull) return;
+    touchGesture.pulling = true;
+    event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("touchend", (event) => {
+    if (!touchGesture.target) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchGesture.startX;
+    const dy = touch.clientY - touchGesture.startY;
+    const elapsed = performance.now() - touchGesture.startTime;
+
+    if (touchGesture.pulling && dy >= PULL_TO_REFRESH_DISTANCE) {
+      showToast("Recargando...");
+      window.setTimeout(() => window.location.reload(), 90);
+      touchGesture.target = null;
+      return;
+    }
+
+    const horizontalSwipe = Math.abs(dx) >= SWIPE_DISTANCE
+      && Math.abs(dx) > Math.abs(dy) * 1.35
+      && elapsed < 900;
+    if (horizontalSwipe) {
+      changeViewBySwipe(dx < 0 ? 1 : -1);
+    }
+    touchGesture.target = null;
+  }, { passive: true });
+
+  document.addEventListener("touchcancel", () => {
+    touchGesture.target = null;
+  }, { passive: true });
+}
+
 function bindEvents() {
   document.addEventListener("pointerdown", primeAudio, { once: true });
   document.addEventListener("keydown", primeAudio, { once: true });
+  bindMediaChange(mobileLandscapeMedia, updateLandscapeWheelMode);
+  updateLandscapeWheelMode();
+  bindMobileGestures();
 
   els.loadNames.addEventListener("click", () => {
     state.participants = uniqueNames(els.bulkNames.value.split(/\n|,/));
@@ -1253,13 +1396,7 @@ function bindEvents() {
 
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".tab-button").forEach((tab) => tab.classList.remove("active"));
-      document.querySelectorAll(".view").forEach((view) => view.classList.remove("active-view"));
-      button.classList.add("active");
-      document.querySelector(`#${button.dataset.view}View`).classList.add("active-view");
-      if (button.dataset.view !== "wheel") {
-        setMobileParticipantsPanel(false);
-      }
+      setActiveView(button.dataset.view);
     });
   });
 

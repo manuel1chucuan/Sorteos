@@ -618,6 +618,24 @@ http://127.0.0.1:5173/
 
 Deja esa terminal abierta mientras pruebas. Cuando termines, presiona `Ctrl+C`.
 
+## Build publicable protegido
+
+Para publicar una version menos facil de reutilizar directamente, genera `dist`:
+
+```powershell
+npm run build
+```
+
+Ese comando:
+
+- Copia `assets`.
+- Minifica `index.html` y `styles.css`.
+- Genera `app.js` ofuscado a partir del codigo fuente.
+
+La carpeta `dist` esta ignorada por Git. Edita siempre los archivos fuente (`index.html`, `styles.css`, `app.js`) y vuelve a correr el build antes de publicar.
+
+El `Dockerfile` ya genera y sirve `dist` automaticamente durante `docker compose up -d --build`.
+
 Cuando los cambios ya se vean bien localmente, se vuelve a desplegar en el servidor con:
 
 ```bash

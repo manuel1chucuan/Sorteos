@@ -1731,7 +1731,7 @@ body.factory .celebrate {
   }
 
   body:has(#wheelView.active-view) .mobile-participants-open-button {
-    top: 280px;
+    top: 270px;
   }
 
   .wheel-wrap {
@@ -1772,5 +1772,130 @@ body.factory .celebrate {
 
   .wheel-zone > .app-tabs {
     top: 8px;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden !important;
+    scroll-snap-type: none !important;
+  }
+
+  body.landscape-wheel-mode .app-shell,
+  body.landscape-wheel-mode .workspace,
+  body.landscape-wheel-mode .wheel-zone,
+  body.landscape-wheel-mode #wheelView,
+  body.landscape-wheel-mode .wheel-layout {
+    position: fixed !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  body.landscape-wheel-mode #wheelView {
+    z-index: 19;
+  }
+
+  body.landscape-wheel-mode .side-panel,
+  body.landscape-wheel-mode .app-tabs,
+  body.landscape-wheel-mode .mobile-participants-open-button,
+  body.landscape-wheel-mode .mobile-modal-backdrop,
+  body.landscape-wheel-mode #statsView,
+  body.landscape-wheel-mode #historyView,
+  body.landscape-wheel-mode #moreView,
+  body.landscape-wheel-mode .mobile-wheel-tabs {
+    display: none !important;
+  }
+
+  body.landscape-wheel-mode .wheel-wrap {
+    position: absolute !important;
+    inset: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 20 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    padding: 8px max(96px, env(safe-area-inset-right)) 8px max(96px, env(safe-area-inset-left)) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  body.landscape-wheel-mode #wheelCanvas {
+    width: min(72vw, 84dvh) !important;
+    max-width: calc(100vw - 210px) !important;
+    max-height: calc(100dvh - 20px) !important;
+  }
+
+  body.landscape-wheel-mode .control-panel {
+    position: fixed !important;
+    inset: auto auto max(10px, env(safe-area-inset-bottom)) 50% !important;
+    z-index: 35 !important;
+    display: block !important;
+    width: min(380px, calc(100vw - 24px)) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transform: translateX(-50%) !important;
+    pointer-events: none !important;
+  }
+
+  body.landscape-wheel-mode .control-panel > * {
+    display: none !important;
+  }
+
+  body.landscape-wheel-mode .control-panel > .button-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    border: 1px solid color-mix(in srgb, var(--line) 80%, transparent) !important;
+    border-radius: var(--radius) !important;
+    background: color-mix(in srgb, var(--panel) 68%, transparent) !important;
+    box-shadow: var(--shadow) !important;
+    backdrop-filter: blur(18px) saturate(1.12) !important;
+    pointer-events: auto !important;
+  }
+
+  body.landscape-wheel-mode .control-panel > .button-row .start-button,
+  body.landscape-wheel-mode .control-panel > .button-row .ghost-button {
+    min-height: 40px !important;
+    padding: 0 18px !important;
+  }
+
+  body.landscape-wheel-mode .winner-alert {
+    z-index: 90 !important;
+  }
+
+  body.landscape-wheel-mode .winner-alert__panel {
+    width: min(88vw, 420px) !important;
+    padding: 18px !important;
+  }
+
+  body.landscape-wheel-mode .winner-alert__panel strong {
+    font-size: clamp(1.7rem, 8vw, 3rem) !important;
   }
 }
