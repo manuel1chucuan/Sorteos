@@ -767,6 +767,89 @@ body.factory .wheel-wrap {
   transform: translate(-50%, 0);
 }
 
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.confetti-canvas.show {
+  opacity: 1;
+}
+
+.winner-alert {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 90;
+  padding: 18px;
+}
+
+.winner-alert.hidden {
+  display: none;
+}
+
+.winner-alert__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.winner-alert__panel {
+  position: relative;
+  width: min(92vw, 460px);
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--gold) 48%, var(--line));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: 0 24px 80px rgba(2, 6, 23, 0.32);
+  text-align: center;
+  transform-origin: center;
+  animation: winner-pop 420ms cubic-bezier(0.2, 0.9, 0.2, 1.18);
+}
+
+.winner-alert__panel h2 {
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+}
+
+.winner-alert__panel strong {
+  display: block;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+  color: var(--gold);
+  font-size: clamp(2rem, 8vw, 3.8rem);
+  line-height: 0.95;
+}
+
+.winner-alert__panel p:not(.eyebrow) {
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.winner-alert__panel .primary-button {
+  min-width: 130px;
+}
+
+@keyframes winner-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.86);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .celebrate {
   display: inline-block;
   color: transparent;
@@ -1345,6 +1428,27 @@ body.factory .celebrate {
   .remove-button:hover {
     background: var(--danger);
     color: #ffffff;
+  }
+
+  .winner-alert__panel {
+    width: min(100%, 390px);
+    padding: 20px;
+  }
+
+  .winner-alert__panel h2 {
+    font-size: 1rem;
+  }
+
+  .winner-alert__panel strong {
+    font-size: clamp(1.8rem, 14vw, 3rem);
+  }
+
+  .winner-alert__panel p:not(.eyebrow) {
+    font-size: 0.92rem;
+  }
+
+  .winner-alert__panel .primary-button {
+    width: 100%;
   }
 
   .dashboard-grid,

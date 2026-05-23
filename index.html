@@ -181,6 +181,17 @@
       </section>
     </main>
 
+    <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
+    <div id="winnerAlert" class="winner-alert hidden" role="dialog" aria-modal="true" aria-labelledby="winnerAlertTitle">
+      <div class="winner-alert__backdrop" data-winner-close></div>
+      <section class="winner-alert__panel">
+        <p class="eyebrow">Tenemos ganador</p>
+        <h2 id="winnerAlertTitle">El ganador ha sido</h2>
+        <strong id="winnerAlertName"></strong>
+        <p id="winnerAlertDetail"></p>
+        <button id="winnerAlertClose" class="primary-button" type="button">Aceptar</button>
+      </section>
+    </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="./app.js"></script>
   </body>

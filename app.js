@@ -41,6 +41,7 @@ const els = {
   roundsList: document.querySelector("#roundsList"),
   clearHistory: document.querySelector("#clearHistory"),
   canvas: document.querySelector("#wheelCanvas"),
+  confettiCanvas: document.querySelector("#confettiCanvas"),
   centerLabel: document.querySelector("#centerLabel"),
   toast: document.querySelector("#toast"),
   themeToggle: document.querySelector("#themeToggle"),
@@ -52,13 +53,20 @@ const els = {
   neverWonList: document.querySelector("#neverWonList"),
   historyList: document.querySelector("#historyList"),
   wheelWrap: document.querySelector(".wheel-wrap"),
+  winnerAlert: document.querySelector("#winnerAlert"),
+  winnerAlertName: document.querySelector("#winnerAlertName"),
+  winnerAlertDetail: document.querySelector("#winnerAlertDetail"),
+  winnerAlertClose: document.querySelector("#winnerAlertClose"),
 };
 
 const ctx = els.canvas.getContext("2d");
+const confettiCtx = els.confettiCanvas.getContext("2d");
 let state = loadState();
 let rotation = 0;
 let spinning = false;
 let drawRunId = 0;
+let confettiFrame = 0;
+let victoryAudio = null;
 
 function defaultState() {
   return {
@@ -586,6 +594,9 @@ function finishDraw(result) {
   els.winnerName.classList.remove("celebrate");
   void els.winnerName.offsetWidth;
   els.winnerName.classList.add("celebrate");
+  showWinnerAlert(result);
+  playVictorySound();
+  startConfetti();
   spinning = false;
   setControlsLocked(false);
   renderStats();
@@ -707,6 +718,125 @@ function showToast(message) {
   showToast.timer = setTimeout(() => els.toast.classList.remove("show"), 2400);
 }
 
+function winnerDetail(result) {
+  return result.mode === "elimination"
+    ? "El ganador ha sido el ultimo participante en pie. Que se escuche la victoria."
+    : `El ganador ha sido elegido en la ronda ${result.drawnNames.length}. Momento de celebrar.`;
+}
+
+function showWinnerAlert(result) {
+  els.winnerAlertName.textContent = result.winner;
+  els.winnerAlertDetail.textContent = winnerDetail(result);
+  els.winnerAlert.classList.remove("hidden");
+  document.body.classList.add("winner-alert-open");
+  els.winnerAlertClose.focus();
+}
+
+function closeWinnerAlert() {
+  els.winnerAlert.classList.add("hidden");
+  document.body.classList.remove("winner-alert-open");
+}
+
+function playVictorySound() {
+  try {
+    const audio = unlockVictorySound();
+    if (!audio) return;
+    if (audio.state === "suspended") audio.resume();
+    const master = audio.createGain();
+    master.gain.setValueAtTime(0.0001, audio.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.16, audio.currentTime + 0.03);
+    master.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 1.35);
+    master.connect(audio.destination);
+
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+      const start = audio.currentTime + index * 0.16;
+      const oscillator = audio.createOscillator();
+      const noteGain = audio.createGain();
+      oscillator.type = index === 3 ? "triangle" : "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      noteGain.gain.setValueAtTime(0.0001, start);
+      noteGain.gain.exponentialRampToValueAtTime(0.8, start + 0.02);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.34);
+      oscillator.connect(noteGain);
+      noteGain.connect(master);
+      oscillator.start(start);
+      oscillator.stop(start + 0.38);
+    });
+  } catch {
+    // Browsers can block audio in some contexts; the visual celebration still runs.
+  }
+}
+
+function unlockVictorySound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    if (!victoryAudio || victoryAudio.state === "closed") {
+      victoryAudio = new AudioContext();
+    }
+    if (victoryAudio.state === "suspended") {
+      const resume = victoryAudio.resume();
+      if (resume?.catch) resume.catch(() => {});
+    }
+    return victoryAudio;
+  } catch {
+    return null;
+  }
+}
+
+function resizeConfettiCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  els.confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+  els.confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+  els.confettiCanvas.style.width = `${window.innerWidth}px`;
+  els.confettiCanvas.style.height = `${window.innerHeight}px`;
+  confettiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function startConfetti() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  cancelAnimationFrame(confettiFrame);
+  resizeConfettiCanvas();
+  els.confettiCanvas.classList.add("show");
+  const colors = ["#ff3d71", "#ffb020", "#12b76a", "#2e90fa", "#9b5cff", "#f7b801", "#14b8a6"];
+  const pieces = Array.from({ length: Math.min(170, Math.floor(window.innerWidth / 4)) }, () => ({
+    x: Math.random() * window.innerWidth,
+    y: -20 - Math.random() * window.innerHeight * 0.35,
+    size: 6 + Math.random() * 9,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    speed: 2.8 + Math.random() * 4.8,
+    drift: -2 + Math.random() * 4,
+    rotation: Math.random() * Math.PI * 2,
+    spin: -0.22 + Math.random() * 0.44,
+  }));
+  const started = performance.now();
+  const duration = 3200;
+
+  function draw(now) {
+    const elapsed = now - started;
+    confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    pieces.forEach((piece) => {
+      piece.y += piece.speed;
+      piece.x += piece.drift;
+      piece.rotation += piece.spin;
+      confettiCtx.save();
+      confettiCtx.translate(piece.x, piece.y);
+      confettiCtx.rotate(piece.rotation);
+      confettiCtx.fillStyle = piece.color;
+      confettiCtx.fillRect(-piece.size / 2, -piece.size / 3, piece.size, piece.size * 0.62);
+      confettiCtx.restore();
+    });
+    if (elapsed < duration) {
+      confettiFrame = requestAnimationFrame(draw);
+      return;
+    }
+    els.confettiCanvas.classList.remove("show");
+    confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+
+  confettiFrame = requestAnimationFrame(draw);
+}
+
 function shuffleParticipants() {
   state.participants = state.participants
     .map((value) => ({ value, order: Math.random() }))
@@ -799,7 +929,18 @@ function bindEvents() {
     saveState();
   });
 
-  els.startDraw.addEventListener("click", runDraw);
+  els.startDraw.addEventListener("click", () => {
+    unlockVictorySound();
+    runDraw();
+  });
+
+  els.winnerAlertClose.addEventListener("click", closeWinnerAlert);
+  els.winnerAlert.querySelector("[data-winner-close]").addEventListener("click", closeWinnerAlert);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.winnerAlert.classList.contains("hidden")) {
+      closeWinnerAlert();
+    }
+  });
 
   els.resetSession.addEventListener("click", () => {
     drawRunId += 1;
@@ -848,7 +989,10 @@ function bindEvents() {
     card.addEventListener("click", () => showToast("Mas sorteos proximamente."));
   });
 
-  window.addEventListener("resize", () => drawWheel(state.participants));
+  window.addEventListener("resize", () => {
+    drawWheel(state.participants);
+    if (els.confettiCanvas.classList.contains("show")) resizeConfettiCanvas();
+  });
 }
 
 bindEvents();
