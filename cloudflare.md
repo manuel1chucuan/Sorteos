@@ -10,6 +10,12 @@ Quick Tunnel activo:
 https://slow-quarterly-males-addition.trycloudflare.com
 ```
 
+URL Vercel de produccion:
+
+```text
+https://ruleta-sepia.vercel.app
+```
+
 Contenedor:
 
 ```text
@@ -39,6 +45,14 @@ Limitacion:
 
 ```text
 La URL trycloudflare.com puede cambiar si se recrea el tunnel.
+```
+
+Nota:
+
+```text
+El Quick Tunnel de Cloudflare no permite elegir un subdominio fijo con nombre como "ruleta".
+Para un nombre propio se necesita un dominio configurado en Cloudflare, por ejemplo:
+ruleta.tudominio.com -> http://localhost:8081
 ```
 
 ## Opcion permanente: dominio en Cloudflare
