@@ -102,10 +102,13 @@
                   </div>
                 </div>
 
-                <label class="check-row">
-                  <input id="avoidRepeat" type="checkbox">
-                  <span>Evitar ganadores repetidos</span>
-                </label>
+                <div class="check-row">
+                  <label class="check-label">
+                    <input id="avoidRepeat" type="checkbox">
+                    <span>Evitar ganadores repetidos</span>
+                  </label>
+                  <button id="soundToggle" class="sound-toggle" type="button" aria-label="Silenciar sonido" title="Silenciar sonido">&#128266;</button>
+                </div>
 
                 <div class="button-row">
                   <button id="startDraw" class="start-button" type="button">Iniciar</button>
@@ -168,13 +171,46 @@
           </div>
 
           <div id="moreView" class="view">
-            <div class="coming-grid">
-              <button class="coming-card" type="button">Tombola</button>
-              <button class="coming-card" type="button">Dados</button>
-              <button class="coming-card" type="button">Cartas</button>
-              <button class="coming-card" type="button">Carrera</button>
-              <button class="coming-card" type="button">Numeros</button>
-              <button class="coming-card" type="button">Equipos</button>
+            <div class="more-stack">
+              <section class="contact-card" aria-label="Contacto">
+                <div class="contact-card__intro">
+                  <h2>Manuel Chucuan</h2>
+                  <p>Programador full stack</p>
+                </div>
+
+                <div class="contact-grid">
+                  <a class="contact-link" href="mailto:manuelivan.cr13@gmail.com">
+                    <span class="contact-icon" aria-hidden="true">&#9993;</span>
+                    <span>
+                      <small>Correo</small>
+                      <strong>manuelivan.cr13@gmail.com</strong>
+                    </span>
+                  </a>
+                  <a class="contact-link" href="https://wa.me/526673225353" target="_blank" rel="noopener">
+                    <span class="contact-icon" aria-hidden="true">&#9742;</span>
+                    <span>
+                      <small>WhatsApp</small>
+                      <strong>6673225353</strong>
+                    </span>
+                  </a>
+                  <div class="contact-link">
+                    <span class="contact-icon" aria-hidden="true">&#9881;</span>
+                    <span>
+                      <small>Servicios</small>
+                      <strong>Sugerencias, reporte de errores y desarrollo</strong>
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <div class="coming-grid">
+                <button class="coming-card" type="button">Tombola</button>
+                <button class="coming-card" type="button">Dados</button>
+                <button class="coming-card" type="button">Cartas</button>
+                <button class="coming-card" type="button">Carrera</button>
+                <button class="coming-card" type="button">Numeros</button>
+                <button class="coming-card" type="button">Equipos</button>
+              </div>
             </div>
           </div>
         </section>

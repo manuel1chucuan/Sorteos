@@ -34,6 +34,7 @@ const els = {
   winnerIndex: document.querySelector("#winnerIndex"),
   speedRange: document.querySelector("#speedRange"),
   avoidRepeat: document.querySelector("#avoidRepeat"),
+  soundToggle: document.querySelector("#soundToggle"),
   startDraw: document.querySelector("#startDraw"),
   resetSession: document.querySelector("#resetSession"),
   winnerName: document.querySelector("#winnerName"),
@@ -67,6 +68,9 @@ let spinning = false;
 let drawRunId = 0;
 let confettiFrame = 0;
 let victoryAudio = null;
+let spinNoise = null;
+let spinNoiseBuffer = null;
+let audioPrimed = false;
 
 function defaultState() {
   return {
@@ -76,6 +80,7 @@ function defaultState() {
       winnerIndex: 5,
       speed: 2,
       avoidRepeat: false,
+      soundEnabled: true,
       theme: "light",
     },
     history: [],
@@ -132,6 +137,7 @@ function setTheme() {
 
 function render() {
   setTheme();
+  renderSoundToggle();
   els.bulkNames.value = state.participants.join("\n");
   els.participantsCount.textContent = `${state.participants.length} participante${state.participants.length === 1 ? "" : "s"}`;
   els.drawMode.value = state.settings.mode;
@@ -144,6 +150,14 @@ function render() {
   renderStats();
   renderHistory();
   drawWheel(state.participants);
+}
+
+function renderSoundToggle() {
+  const enabled = state.settings.soundEnabled !== false;
+  els.soundToggle.textContent = enabled ? "🔊" : "🔇";
+  els.soundToggle.title = enabled ? "Silenciar sonido" : "Activar sonido";
+  els.soundToggle.setAttribute("aria-label", enabled ? "Silenciar sonido" : "Activar sonido");
+  els.soundToggle.classList.toggle("muted", !enabled);
 }
 
 function renderParticipants() {
@@ -484,7 +498,7 @@ function delay(ms) {
 }
 
 function setControlsLocked(locked) {
-  const keepEnabled = new Set([els.resetSession, els.speedRange]);
+  const keepEnabled = new Set([els.resetSession, els.speedRange, els.soundToggle]);
   document.querySelectorAll("button, input, select, textarea").forEach((control) => {
     if (keepEnabled.has(control)) {
       control.disabled = false;
@@ -501,11 +515,14 @@ async function spinTo(name, names, isFinal) {
   const current = normalizeDegrees(rotation);
   const delta = normalizeDegrees(target - current);
   rotation += speed.spins * 360 + delta;
+  if (!spinNoise) startWheelSpinSound();
+  rampWheelSpinSound(speed.duration);
   drawWheel(names);
   document.documentElement.style.setProperty("--spin-duration", `${speed.duration}ms`);
   document.documentElement.style.setProperty("--wheel-rotation", `${rotation}deg`);
   els.centerLabel.textContent = isFinal ? "Final" : "Ronda";
   await delay(speed.duration + 80);
+  stopWheelSpinSound(false);
   if (runId !== drawRunId) return false;
   drawWheel(names, name);
   els.centerLabel.textContent = name;
@@ -527,6 +544,7 @@ async function runDraw() {
   spinning = true;
   drawRunId += 1;
   const runId = drawRunId;
+  startWheelSpinSound();
   setControlsLocked(true);
   els.winnerName.classList.remove("celebrate");
   els.wheelWrap.classList.remove("winner-flash");
@@ -571,6 +589,7 @@ async function runDraw() {
 }
 
 function finishDraw(result) {
+  stopWheelSpinSound();
   const now = new Date().toISOString();
   state.sessionWinners.push(result.winner);
   state.history.unshift({
@@ -738,6 +757,7 @@ function closeWinnerAlert() {
 }
 
 function playVictorySound() {
+  if (state.settings.soundEnabled === false) return;
   try {
     const audio = unlockVictorySound();
     if (!audio) return;
@@ -767,7 +787,148 @@ function playVictorySound() {
   }
 }
 
+function startWheelSpinSound() {
+  if (state.settings.soundEnabled === false) return;
+  try {
+    stopWheelSpinSound(false);
+    const audio = unlockVictorySound();
+    if (!audio) return;
+    if (audio.state === "suspended") audio.resume();
+
+    const master = audio.createGain();
+    const noise = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
+    noise.buffer = getSpinNoiseBuffer(audio);
+    noise.loop = true;
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(760, audio.currentTime);
+    filter.Q.setValueAtTime(2.6, audio.currentTime);
+    master.gain.setValueAtTime(0.0001, audio.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.018, audio.currentTime + 0.12);
+    noise.connect(filter);
+    filter.connect(master);
+    master.connect(audio.destination);
+    noise.start();
+
+    spinNoise = { audio, noise, filter, master, clickTimer: 0, active: false };
+  } catch {
+    spinNoise = null;
+  }
+}
+
+function rampWheelSpinSound(durationMs) {
+  if (!spinNoise) return;
+  const { audio, filter, master } = spinNoise;
+  const now = audio.currentTime;
+  const duration = Math.max(0.6, durationMs / 1000);
+  try {
+    filter.frequency.cancelScheduledValues(now);
+    master.gain.cancelScheduledValues(now);
+
+    filter.frequency.setValueAtTime(860, now);
+    filter.frequency.exponentialRampToValueAtTime(180, now + duration * 0.95);
+    master.gain.setValueAtTime(0.02, now);
+    master.gain.exponentialRampToValueAtTime(0.004, now + duration * 0.88);
+    scheduleRouletteClicks(durationMs);
+  } catch {
+    // The spin sound is optional; keep the visual draw running.
+  }
+}
+
+function scheduleRouletteClicks(durationMs) {
+  if (!spinNoise) return;
+  clearTimeout(spinNoise.clickTimer);
+  spinNoise.active = true;
+  const started = performance.now();
+  const duration = Math.max(500, durationMs);
+
+  function queueNext() {
+    if (!spinNoise?.active) return;
+    const elapsed = performance.now() - started;
+    const progress = Math.min(1, elapsed / duration);
+    const interval = 24 + progress * progress * 170;
+    const pitch = 1320 - progress * 620;
+    const volume = 0.075 - progress * 0.045;
+    playRouletteClick(pitch, volume);
+    if (progress >= 0.98) return;
+    spinNoise.clickTimer = setTimeout(queueNext, interval);
+  }
+
+  queueNext();
+}
+
+function playRouletteClick(frequency, volume) {
+  if (!spinNoise) return;
+  const audio = spinNoise.audio;
+  const now = audio.currentTime;
+  try {
+    const click = audio.createOscillator();
+    const gain = audio.createGain();
+    const filter = audio.createBiquadFilter();
+    click.type = "triangle";
+    click.frequency.setValueAtTime(frequency, now);
+    click.frequency.exponentialRampToValueAtTime(Math.max(220, frequency * 0.42), now + 0.035);
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(420, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.006, volume), now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+    click.connect(filter);
+    filter.connect(gain);
+    gain.connect(audio.destination);
+    click.start(now);
+    click.stop(now + 0.055);
+  } catch {
+    // Skip individual clicks if audio is unavailable.
+  }
+}
+
+function stopWheelSpinSound(playBrake = false) {
+  if (!spinNoise) {
+    if (playBrake) playBrakeSound();
+    return;
+  }
+  const { audio, noise, master } = spinNoise;
+  const now = audio.currentTime;
+  try {
+    spinNoise.active = false;
+    clearTimeout(spinNoise.clickTimer);
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    noise.stop(now + 0.08);
+  } catch {
+    // Sound nodes may already be stopped.
+  }
+  spinNoise = null;
+  if (playBrake) playBrakeSound();
+}
+
+function playBrakeSound() {
+  if (state.settings.soundEnabled === false) return;
+  try {
+    const audio = unlockVictorySound();
+    if (!audio) return;
+    if (audio.state === "suspended") audio.resume();
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    oscillator.type = "sawtooth";
+    oscillator.frequency.setValueAtTime(180, audio.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(48, audio.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.0001, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, audio.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.22);
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+    oscillator.start();
+    oscillator.stop(audio.currentTime + 0.24);
+  } catch {
+    // Keep reset behavior silent if audio is blocked.
+  }
+}
+
 function unlockVictorySound() {
+  if (state.settings.soundEnabled === false) return null;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return null;
@@ -782,6 +943,40 @@ function unlockVictorySound() {
   } catch {
     return null;
   }
+}
+
+function getSpinNoiseBuffer(audio) {
+  if (spinNoiseBuffer && spinNoiseBuffer.sampleRate === audio.sampleRate) {
+    return spinNoiseBuffer;
+  }
+  const bufferSize = audio.sampleRate * 2;
+  spinNoiseBuffer = audio.createBuffer(1, bufferSize, audio.sampleRate);
+  const data = spinNoiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i += 1) {
+    data[i] = (Math.random() * 2 - 1) * 0.32;
+  }
+  return spinNoiseBuffer;
+}
+
+function primeAudio() {
+  if (state.settings.soundEnabled === false) return;
+  if (audioPrimed) return;
+  const audio = unlockVictorySound();
+  if (!audio) return;
+  getSpinNoiseBuffer(audio);
+  try {
+    const gain = audio.createGain();
+    const oscillator = audio.createOscillator();
+    gain.gain.setValueAtTime(0.0001, audio.currentTime);
+    oscillator.frequency.setValueAtTime(1, audio.currentTime);
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+    oscillator.start();
+    oscillator.stop(audio.currentTime + 0.03);
+  } catch {
+    // Prewarm is best-effort.
+  }
+  audioPrimed = true;
 }
 
 function resizeConfettiCanvas() {
@@ -860,6 +1055,9 @@ function setMobileParticipantsPanel(open) {
 }
 
 function bindEvents() {
+  document.addEventListener("pointerdown", primeAudio, { once: true });
+  document.addEventListener("keydown", primeAudio, { once: true });
+
   els.loadNames.addEventListener("click", () => {
     state.participants = uniqueNames(els.bulkNames.value.split(/\n|,/));
     resetWheelPosition();
@@ -929,8 +1127,21 @@ function bindEvents() {
     saveState();
   });
 
+  els.soundToggle.addEventListener("click", () => {
+    state.settings.soundEnabled = state.settings.soundEnabled === false;
+    if (!state.settings.soundEnabled) {
+      stopWheelSpinSound(false);
+    } else {
+      audioPrimed = false;
+      primeAudio();
+    }
+    saveState();
+    renderSoundToggle();
+  });
+
+  els.startDraw.addEventListener("pointerdown", primeAudio);
   els.startDraw.addEventListener("click", () => {
-    unlockVictorySound();
+    primeAudio();
     runDraw();
   });
 
@@ -945,6 +1156,7 @@ function bindEvents() {
   els.resetSession.addEventListener("click", () => {
     drawRunId += 1;
     spinning = false;
+    stopWheelSpinSound(true);
     setControlsLocked(false);
     state.sessionWinners = [];
     resetWheelPosition();
