@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101828">
+    <title>Sorteos</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="Sorteo de ruleta">
+        <aside class="side-panel participants-panel">
+          <div class="brand-row">
+            <div>
+              <p class="eyebrow">Sorteos</p>
+              <h1>Ruleta</h1>
+            </div>
+            <button class="icon-button" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">◐</button>
+          </div>
+
+          <button id="mobileParticipantsMore" class="mobile-more-button" type="button" aria-expanded="false" aria-label="Mostrar mas">...</button>
+          <div id="bulkTools" class="bulk-tools">
+            <label class="input-label" for="bulkNames">Participantes</label>
+            <textarea id="bulkNames" rows="8" placeholder="Pega nombres, uno por linea"></textarea>
+            <div class="button-row">
+              <button id="loadNames" class="primary-button" type="button">Cargar lista</button>
+              <button id="shuffleNames" class="ghost-button" type="button">Mezclar</button>
+            </div>
+          </div>
+
+          <form id="singleNameForm" class="inline-form">
+            <input id="singleName" type="text" placeholder="Agregar nombre">
+            <button class="square-button" type="submit" title="Agregar" aria-label="Agregar">+</button>
+          </form>
+
+          <div class="participants-header">
+            <strong id="participantsCount">0 participantes</strong>
+            <div class="participant-actions">
+              <button id="shuffleNamesCompact" class="text-button mobile-only" type="button">Mezclar</button>
+              <button id="clearNames" class="text-button" type="button">Limpiar</button>
+            </div>
+          </div>
+          <ul id="participantsList" class="participants-list" aria-live="polite"></ul>
+        </aside>
+
+        <button id="mobileParticipantsOpen" class="mobile-participants-open-button mobile-only" type="button" aria-controls="participantsList" aria-expanded="false" aria-label="Abrir opciones de participantes">&#9881;</button>
+        <div id="mobileParticipantsBackdrop" class="mobile-modal-backdrop" aria-hidden="true"></div>
+
+        <section class="wheel-zone">
+          <nav class="app-tabs" aria-label="Modos de sorteo">
+            <button class="tab-button active" data-view="wheel" type="button">Ruleta</button>
+            <button class="tab-button" data-view="stats" type="button">Metricas</button>
+            <button class="tab-button" data-view="history" type="button">Historial</button>
+            <button class="tab-button" data-view="more" type="button">Mas sorteos</button>
+          </nav>
+
+          <div id="wheelView" class="view active-view">
+            <div class="wheel-layout">
+              <div class="wheel-wrap">
+                <canvas id="wheelCanvas" width="840" height="840" aria-label="Ruleta de participantes"></canvas>
+                <div class="wheel-pointer" aria-hidden="true"></div>
+                <div class="wheel-center">
+                  <span id="centerLabel">Listo</span>
+                </div>
+              </div>
+
+              <nav class="app-tabs mobile-wheel-tabs" aria-label="Modos de sorteo movil">
+                <button class="tab-button active" data-view="wheel" type="button">Ruleta</button>
+                <button class="tab-button" data-view="stats" type="button">Metricas</button>
+                <button class="tab-button" data-view="history" type="button">Historial</button>
+                <button class="tab-button" data-view="more" type="button">Mas sorteos</button>
+              </nav>
+
+              <section class="control-panel">
+                <button id="mobileSettingsMore" class="mobile-more-button" type="button" aria-expanded="false" aria-label="Mostrar mas">...</button>
+                <div id="settingsAdvanced" class="settings-advanced">
+                  <div class="section-title">
+                    <p class="eyebrow">Configuracion</p>
+                    <h2>Reglas del sorteo</h2>
+                  </div>
+
+                  <label class="input-label" for="drawMode">Modo</label>
+                  <select id="drawMode">
+                    <option value="first">Gana el primero</option>
+                    <option value="nth">Gana el N resultado</option>
+                    <option value="elimination">Eliminacion</option>
+                  </select>
+
+                  <div id="nthConfig" class="field-grid hidden">
+                    <label class="input-label" for="winnerIndex">Resultado ganador</label>
+                    <input id="winnerIndex" type="number" min="2" max="99" value="5">
+                  </div>
+
+                  <label class="input-label" for="speedRange">Rapidez</label>
+                  <input id="speedRange" type="range" min="1" max="4" value="2">
+                  <div class="range-labels">
+                    <span>Lento</span>
+                    <span>Medio</span>
+                    <span>Rapido</span>
+                    <span>Turbo</span>
+                  </div>
+                </div>
+
+                <label class="check-row">
+                  <input id="avoidRepeat" type="checkbox">
+                  <span>Evitar ganadores repetidos</span>
+                </label>
+
+                <div class="button-row">
+                  <button id="startDraw" class="start-button" type="button">Iniciar</button>
+                  <button id="resetSession" class="ghost-button" type="button">Reiniciar</button>
+                </div>
+
+                <div class="result-box" aria-live="polite">
+                  <p class="eyebrow">Resultado</p>
+                  <h3 id="winnerName">Sin ganador aun</h3>
+                  <p id="resultDetail">Agrega participantes y presiona iniciar.</p>
+                </div>
+
+                <div class="rounds-box">
+                  <div class="participants-header">
+                    <strong>Rondas</strong>
+                    <button id="clearHistory" class="text-button" type="button">Borrar historial</button>
+                  </div>
+                  <ol id="roundsList" class="rounds-list"></ol>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div id="statsView" class="view">
+            <div class="dashboard-grid">
+              <section class="metric-card">
+                <p>Total sorteos</p>
+                <strong id="totalDraws">0</strong>
+              </section>
+              <section class="metric-card">
+                <p>Mas victorias</p>
+                <strong id="topWinner">Nadie</strong>
+              </section>
+              <section class="metric-card">
+                <p>Mas participaciones</p>
+                <strong id="topParticipant">Nadie</strong>
+              </section>
+              <section class="metric-card">
+                <p>Mas eliminado</p>
+                <strong id="topEliminated">Nadie</strong>
+              </section>
+            </div>
+            <div class="tables-grid">
+              <section class="data-panel">
+                <h2>Ranking de ganadores</h2>
+                <ul id="winnersRanking" class="ranking-list"></ul>
+              </section>
+              <section class="data-panel">
+                <h2>Participantes sin ganar</h2>
+                <ul id="neverWonList" class="ranking-list"></ul>
+              </section>
+            </div>
+          </div>
+
+          <div id="historyView" class="view">
+            <section class="data-panel full-panel">
+              <h2>Historial</h2>
+              <ul id="historyList" class="history-list"></ul>
+            </section>
+          </div>
+
+          <div id="moreView" class="view">
+            <div class="coming-grid">
+              <button class="coming-card" type="button">Tombola</button>
+              <button class="coming-card" type="button">Dados</button>
+              <button class="coming-card" type="button">Cartas</button>
+              <button class="coming-card" type="button">Carrera</button>
+              <button class="coming-card" type="button">Numeros</button>
+              <button class="coming-card" type="button">Equipos</button>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

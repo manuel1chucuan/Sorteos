@@ -1,0 +1,7 @@
+services:
+  sorteos:
+    build: .
+    container_name: sorteos
+    restart: unless-stopped
+    ports:
+      - "8081:80"
