@@ -71,6 +71,10 @@ let victoryAudio = null;
 let spinNoise = null;
 let spinNoiseBuffer = null;
 let audioPrimed = false;
+let audioReadyPromise = null;
+let startDrawPointerHandled = false;
+let spinSoundWarmupDone = false;
+let spinSoundWarmupRunning = false;
 
 function defaultState() {
   return {
@@ -531,16 +535,17 @@ async function spinTo(name, names, isFinal) {
   return true;
 }
 
-async function runDraw() {
+async function runDraw(prebuiltResult = null) {
   if (spinning) return;
   let result;
   try {
-    result = buildDraw();
+    result = prebuiltResult || buildDraw();
   } catch (error) {
     showToast(error.message);
     return;
   }
 
+  primeAudio();
   spinning = true;
   drawRunId += 1;
   const runId = drawRunId;
@@ -787,7 +792,8 @@ function playVictorySound() {
   }
 }
 
-function startWheelSpinSound() {
+function startWheelSpinSound(options = {}) {
+  const silent = Boolean(options.silent);
   if (state.settings.soundEnabled === false) return;
   try {
     stopWheelSpinSound(false);
@@ -804,13 +810,13 @@ function startWheelSpinSound() {
     filter.frequency.setValueAtTime(760, audio.currentTime);
     filter.Q.setValueAtTime(2.6, audio.currentTime);
     master.gain.setValueAtTime(0.0001, audio.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.018, audio.currentTime + 0.12);
+    master.gain.exponentialRampToValueAtTime(silent ? 0.0001 : 0.018, audio.currentTime + 0.12);
     noise.connect(filter);
     filter.connect(master);
     master.connect(audio.destination);
     noise.start();
 
-    spinNoise = { audio, noise, filter, master, clickTimer: 0, active: false };
+    spinNoise = { audio, noise, filter, master, clickTimer: 0, active: false, silent };
   } catch {
     spinNoise = null;
   }
@@ -818,7 +824,7 @@ function startWheelSpinSound() {
 
 function rampWheelSpinSound(durationMs) {
   if (!spinNoise) return;
-  const { audio, filter, master } = spinNoise;
+  const { audio, filter, master, silent } = spinNoise;
   const now = audio.currentTime;
   const duration = Math.max(0.6, durationMs / 1000);
   try {
@@ -827,8 +833,8 @@ function rampWheelSpinSound(durationMs) {
 
     filter.frequency.setValueAtTime(860, now);
     filter.frequency.exponentialRampToValueAtTime(180, now + duration * 0.95);
-    master.gain.setValueAtTime(0.02, now);
-    master.gain.exponentialRampToValueAtTime(0.004, now + duration * 0.88);
+    master.gain.setValueAtTime(silent ? 0.0001 : 0.02, now);
+    master.gain.exponentialRampToValueAtTime(silent ? 0.0001 : 0.004, now + duration * 0.88);
     scheduleRouletteClicks(durationMs);
   } catch {
     // The spin sound is optional; keep the visual draw running.
@@ -848,7 +854,7 @@ function scheduleRouletteClicks(durationMs) {
     const progress = Math.min(1, elapsed / duration);
     const interval = 24 + progress * progress * 170;
     const pitch = 1320 - progress * 620;
-    const volume = 0.075 - progress * 0.045;
+    const volume = spinNoise.silent ? 0.0001 : 0.075 - progress * 0.045;
     playRouletteClick(pitch, volume);
     if (progress >= 0.98) return;
     spinNoise.clickTimer = setTimeout(queueNext, interval);
@@ -935,14 +941,30 @@ function unlockVictorySound() {
     if (!victoryAudio || victoryAudio.state === "closed") {
       victoryAudio = new AudioContext();
     }
-    if (victoryAudio.state === "suspended") {
-      const resume = victoryAudio.resume();
-      if (resume?.catch) resume.catch(() => {});
-    }
     return victoryAudio;
   } catch {
     return null;
   }
+}
+
+function resumeVictoryAudio(audio) {
+  if (!audio || audio.state === "running") {
+    audioPrimed = Boolean(audio);
+    return Promise.resolve(audio);
+  }
+  if (!audioReadyPromise) {
+    audioReadyPromise = audio.resume()
+      .then(() => {
+        audioPrimed = true;
+        audioReadyPromise = null;
+        return audio;
+      })
+      .catch(() => {
+        audioReadyPromise = null;
+        return audio;
+      });
+  }
+  return audioReadyPromise;
 }
 
 function getSpinNoiseBuffer(audio) {
@@ -959,10 +981,10 @@ function getSpinNoiseBuffer(audio) {
 }
 
 function primeAudio() {
-  if (state.settings.soundEnabled === false) return;
-  if (audioPrimed) return;
+  if (state.settings.soundEnabled === false) return Promise.resolve(null);
+  if (audioPrimed && victoryAudio?.state === "running") return Promise.resolve(victoryAudio);
   const audio = unlockVictorySound();
-  if (!audio) return;
+  if (!audio) return Promise.resolve(null);
   getSpinNoiseBuffer(audio);
   try {
     const gain = audio.createGain();
@@ -976,7 +998,44 @@ function primeAudio() {
   } catch {
     // Prewarm is best-effort.
   }
-  audioPrimed = true;
+  return resumeVictoryAudio(audio);
+}
+
+function warmupSpinSound() {
+  if (state.settings.soundEnabled === false || spinSoundWarmupDone) {
+    return Promise.resolve();
+  }
+  primeAudio();
+  startWheelSpinSound({ silent: true });
+  rampWheelSpinSound(280);
+  return delay(320).then(() => {
+    stopWheelSpinSound(false);
+    spinSoundWarmupDone = true;
+  });
+}
+
+async function startDrawWithAudioWarmup() {
+  if (spinning || spinSoundWarmupRunning) return;
+  let result;
+  try {
+    result = buildDraw();
+  } catch (error) {
+    showToast(error.message);
+    return;
+  }
+
+  if (state.settings.soundEnabled !== false && !spinSoundWarmupDone) {
+    spinSoundWarmupRunning = true;
+    const originalText = els.startDraw.textContent;
+    els.startDraw.disabled = true;
+    els.startDraw.textContent = "Preparando...";
+    await warmupSpinSound();
+    els.startDraw.textContent = originalText;
+    els.startDraw.disabled = false;
+    spinSoundWarmupRunning = false;
+  }
+
+  runDraw(result);
 }
 
 function resizeConfettiCanvas() {
@@ -1133,16 +1192,23 @@ function bindEvents() {
       stopWheelSpinSound(false);
     } else {
       audioPrimed = false;
+      spinSoundWarmupDone = false;
       primeAudio();
     }
     saveState();
     renderSoundToggle();
   });
 
-  els.startDraw.addEventListener("pointerdown", primeAudio);
+  els.startDraw.addEventListener("pointerdown", () => {
+    startDrawPointerHandled = true;
+    startDrawWithAudioWarmup();
+  });
   els.startDraw.addEventListener("click", () => {
-    primeAudio();
-    runDraw();
+    if (startDrawPointerHandled) {
+      startDrawPointerHandled = false;
+      return;
+    }
+    startDrawWithAudioWarmup();
   });
 
   els.winnerAlertClose.addEventListener("click", closeWinnerAlert);
