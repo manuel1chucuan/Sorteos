@@ -504,6 +504,10 @@ body.factory .start-button {
   border-color: var(--primary-strong);
 }
 
+.tab-button:focus:not(:focus-visible) {
+  outline: 0;
+}
+
 .view {
   display: none;
 }
@@ -1336,24 +1340,77 @@ body.factory .celebrate {
     height: 42px;
     min-height: 42px;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--primary) 44%, var(--line));
+    border: 1px solid color-mix(in srgb, #ffffff 58%, var(--primary));
     border-radius: 50%;
-    background: color-mix(in srgb, var(--panel) 68%, transparent);
-    color: var(--ink);
-    box-shadow: var(--shadow);
+    background:
+      radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.92) 0 12%, transparent 34%),
+      linear-gradient(145deg, #ffffff 0%, color-mix(in srgb, var(--primary) 22%, #ffffff) 44%, var(--primary) 100%);
+    color: #0b3b37;
+    box-shadow:
+      0 14px 24px color-mix(in srgb, var(--primary) 34%, transparent),
+      0 6px 0 color-mix(in srgb, var(--primary-strong) 76%, #0f172a),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78),
+      inset 0 -10px 18px color-mix(in srgb, var(--primary-strong) 26%, transparent);
     backdrop-filter: blur(16px) saturate(1.08);
-    font-size: 1.1rem;
+    font-size: 1.55rem;
+    font-weight: 950;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
     transition:
       opacity 180ms ease,
       transform 180ms ease,
       background-color 150ms ease,
-      border-color 150ms ease;
+      border-color 150ms ease,
+      box-shadow 180ms ease,
+      filter 180ms ease;
   }
 
   body:has(#wheelView.active-view) .mobile-participants-open-button:hover {
-    border-color: var(--primary);
-    background: color-mix(in srgb, var(--panel-soft) 76%, transparent);
-    transform: translateY(-1px);
+    border-color: color-mix(in srgb, #ffffff 72%, var(--primary));
+    filter: saturate(1.1) brightness(1.04);
+    transform: translateY(-3px);
+    box-shadow:
+      0 18px 30px color-mix(in srgb, var(--primary) 42%, transparent),
+      0 8px 0 color-mix(in srgb, var(--primary-strong) 82%, #0f172a),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82),
+      inset 0 -10px 18px color-mix(in srgb, var(--primary-strong) 30%, transparent);
+  }
+
+  body:has(#wheelView.active-view) .mobile-participants-open-button:active {
+    transform: translateY(3px) scale(0.98);
+    box-shadow:
+      0 8px 16px color-mix(in srgb, var(--primary) 30%, transparent),
+      0 2px 0 color-mix(in srgb, var(--primary-strong) 78%, #0f172a),
+      inset 0 1px 0 rgba(255, 255, 255, 0.58),
+      inset 0 -6px 12px color-mix(in srgb, var(--primary-strong) 26%, transparent);
+  }
+
+  body.dark:has(#wheelView.active-view) .mobile-participants-open-button {
+    border-color: color-mix(in srgb, #ffffff 50%, #67e8f9);
+    background:
+      radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.90) 0 10%, transparent 32%),
+      linear-gradient(145deg, #67e8f9 0%, #2563eb 48%, #7c3aed 100%);
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(15, 23, 42, 0.55);
+    box-shadow:
+      0 16px 28px rgba(37, 99, 235, 0.42),
+      0 6px 0 #312e81,
+      inset 0 1px 0 rgba(255, 255, 255, 0.54),
+      inset 0 -10px 18px rgba(49, 46, 129, 0.42);
+  }
+
+  body.factory:has(#wheelView.active-view) .mobile-participants-open-button {
+    border-color: color-mix(in srgb, #fff1a8 72%, #f7b801);
+    background:
+      radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.86) 0 10%, transparent 32%),
+      linear-gradient(145deg, #f7b801 0%, #d92d20 56%, #155eef 100%);
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(10, 13, 18, 0.58);
+    box-shadow:
+      0 16px 28px rgba(217, 45, 32, 0.42),
+      0 6px 0 #7a271a,
+      inset 0 1px 0 rgba(255, 255, 255, 0.54),
+      inset 0 -10px 18px rgba(122, 39, 26, 0.38);
   }
 
   body.mobile-participants-open .mobile-participants-open-button,

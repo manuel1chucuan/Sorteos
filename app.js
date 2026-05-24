@@ -1151,14 +1151,25 @@ function updateLandscapeWheelMode() {
   }
 }
 
-function setActiveView(viewName) {
+function openMobileParticipantsOnLoad() {
+  if (!mobileGestureMedia.matches || mobileLandscapeMedia.matches || currentViewName() !== "wheel") return;
+  setMobileParticipantsPanel(true);
+}
+
+function setActiveView(viewName, options = {}) {
   if (!VIEWS.includes(viewName)) return;
   document.querySelectorAll(".tab-button").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.view === viewName);
+    const active = tab.dataset.view === viewName;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("active-view", view.id === `${viewName}View`);
   });
+  if (options.fromGesture && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   if (viewName !== "wheel") {
     setMobileParticipantsPanel(false);
   }
@@ -1173,12 +1184,12 @@ function changeViewBySwipe(direction) {
   const currentIndex = VIEWS.indexOf(currentViewName());
   const nextIndex = currentIndex + direction;
   if (nextIndex < 0 || nextIndex >= VIEWS.length) return;
-  setActiveView(VIEWS[nextIndex]);
+  setActiveView(VIEWS[nextIndex], { fromGesture: true });
 }
 
 function isGestureTargetBlocked(target) {
   if (!(target instanceof Element)) return true;
-  return Boolean(target.closest("input, textarea, select, button, a, .winner-alert, .mobile-participants-open .participants-panel"));
+  return Boolean(target.closest("input, textarea, select, .winner-alert"));
 }
 
 function nearestScrollable(target) {
@@ -1412,3 +1423,4 @@ function bindEvents() {
 
 bindEvents();
 render();
+requestAnimationFrame(openMobileParticipantsOnLoad);
